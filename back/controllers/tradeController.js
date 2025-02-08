@@ -41,43 +41,51 @@ exports.convertCurrency = async (req, res) => {
 
 exports.getBalance = async (req, res) => {
   try {
+    // 🔹 جلب بيانات الحساب
     const accountInfo = await client.accountInfo();
-    const balances = accountInfo.balances.filter((b) => parseFloat(b.free) > 0);
+    const balances = accountInfo.balances.filter(b => parseFloat(b.free) > 0);
+    
+    // 🔹 جلب أسعار العملات من Binance
+    const prices = await client.prices();
 
     let totalUSDT = 0;
-    let freeUSDT = 0; // الرصيد المتاح للتداول فقط
-    const assetPrices = {};
+    let freeUSDT = 0;
 
-    for (const balance of balances) {
+    // 🔹 حساب إجمالي الرصيد بالدولار + نسبة المكسب والخسارة
+    const formattedBalances = balances.map(balance => {
       const asset = balance.asset;
-      const freeAmount = parseFloat(balance.free);
+      const free = parseFloat(balance.free);
+      const price = prices[`${asset}USDT`] ? parseFloat(prices[`${asset}USDT`]) : 1;
+      
+      const valueInUSDT = free * price;
+      totalUSDT += valueInUSDT;
 
       if (asset === "USDT") {
-        totalUSDT += freeAmount;
-        freeUSDT = freeAmount; // نأخذ فقط الرصيد الحر
-        continue;
+        freeUSDT = free;
       }
 
-      try {
-        const priceData = await client.prices({ symbol: `${asset}USDT` });
-        const price = parseFloat(priceData[`${asset}USDT`]);
+      // 🔹 حساب نسبة المكسب/الخسارة (مثال: إذا اشترينا بسعر 50 والآن 55 => 10%)
+      const purchasePrice = 50; // 👈 هنا يفترض استبداله بسعر الشراء الفعلي من الـ DB
+      const profitLossPercent = purchasePrice ? ((price - purchasePrice) / purchasePrice) * 100 : 0;
 
-        if (!isNaN(price)) {
-          assetPrices[asset] = price;
-          totalUSDT += freeAmount * price;
-        }
-      } catch (error) {
-        console.error(`Failed to get price for ${asset}USDT`, error.message);
-      }
-    }
+      return {
+        asset,
+        free: free.toFixed(6),
+        valueInUSDT: valueInUSDT.toFixed(2),
+        profitLossPercent: profitLossPercent.toFixed(2),
+      };
+    });
 
-    res.json({ success: true, balances, totalUSDT, freeUSDT, assetPrices });
+    res.json({
+      balances: formattedBalances,
+      totalUSDT: totalUSDT.toFixed(2),
+      freeUSDT: freeUSDT.toFixed(2),
+    });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-
-
 
 
 
@@ -152,3 +160,26 @@ exports.placeOrder = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+
+// ✅ API لجلب أسعار العملات ونسبة التغيير خلال 24 ساعة
+exports.getMarketData = async (req, res) => {
+  try {
+    const tickerData = await client.dailyStats(); // 🔹 جلب بيانات التداول خلال 24 ساعة
+    const prices = await client.prices(); // 🔹 جلب الأسعار الحالية
+
+    const formattedData = Object.keys(prices).map((symbol) => {
+      const ticker = tickerData.find((t) => t.symbol === symbol);
+      return {
+        asset: symbol.replace("USDT", ""), // 🔹 إزالة "USDT" من الاسم
+        lastPrice: parseFloat(prices[symbol]).toFixed(6), // 🔹 السعر الأخير
+        changePercent: ticker ? parseFloat(ticker.priceChangePercent).toFixed(2) : "0.00", // 🔹 نسبة التغيير
+      };
+    });
+
+    res.json({ marketData: formattedData });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
