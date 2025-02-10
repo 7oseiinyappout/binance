@@ -9,8 +9,9 @@ export default function Home() {
   const [freeUSDT, setFreeUSDT] = useState(0);
   const [loading, setLoading] = useState(false);
   const [marketData, setMarketData] = useState([]);
-  const [sortBy, setSortBy] = useState("profit"); // 🔹 الربح الافتراضي
+  const [sortBy, setSortBy] = useState("profit");
   const [filteredData, setFilteredData] = useState([]);
+  const [autoTrade, setAutoTrade] = useState({});
 
   const fetchMarketData = async () => {
     try {
@@ -21,6 +22,7 @@ export default function Home() {
       console.error("Error fetching market data:", error);
     }
   };
+  
   const fetchBalance = async () => {
     try {
       const response = await axios.get("http://localhost:5000/api/trade/balance");
@@ -63,11 +65,39 @@ export default function Home() {
     setLoading(false);
   };
 
+  useEffect(() => {
+    fetchBalance();
+    fetchMarketData();
+    const interval = setInterval(fetchMarketData, 10000);
+    return () => clearInterval(interval);
+  }, [sortBy]);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const marketPrices = await axios.get("http://localhost:5000/api/trade/market");
+        marketPrices.data.marketData.forEach((data) => {
+          if (autoTrade[data.asset]) {
+            if (autoTrade[data.asset].buyPrice && data.lastPrice <= autoTrade[data.asset].buyPrice) {
+              handleTrade(data.asset, "BUY", autoTrade[data.asset].buyPrice);
+            }
+            if (autoTrade[data.asset].sellPrice && data.lastPrice >= autoTrade[data.asset].sellPrice) {
+              handleTrade(data.asset, "SELL", autoTrade[data.asset].sellPrice);
+            }
+          }
+        });
+      } catch (error) {
+        console.error("Error checking auto trade conditions:", error);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [autoTrade]);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
       <h1 className="text-3xl font-bold mb-4">My Binance Balance</h1>
       <div className="bg-white shadow-lg rounded-lg p-6 w-full max-w-3xl">
-        <table className="w-full border-collapse border border-gray-300">
+      <table className="w-full border-collapse border border-gray-300">
           <thead>
             <tr className="bg-gray-200">
               <th className="p-2 border">Asset</th>
@@ -83,28 +113,12 @@ export default function Home() {
                 <td className="p-2 border">{balance.asset}</td>
                 <td className="p-2 border">{balance.free}</td>
                 <td className="p-2 border">${balance.valueInUSDT}</td>
-                <td
-                  className={`p-2 border font-bold ${
-                    balance.profitLossPercent >= 0 ? "text-green-500" : "text-red-500"
-                  }`}
-                >
-                  {balance.profitLossPercent}%
-                </td>
-                <td className="p-2 border">
-                  <button
-                    className="bg-green-500 text-white px-3 py-1 rounded mr-2 disabled:opacity-50"
-                    onClick={() => handleTrade(balance.asset, "BUY")}
-                    disabled={loading}
-                  >
-                    {loading ? "Processing..." : "Buy 100%"}
-                  </button>
-                  <button
-                    className="bg-red-500 text-white px-3 py-1 rounded disabled:opacity-50"
-                    onClick={() => handleTrade(balance.asset, "SELL")}
-                    disabled={loading}
-                  >
-                    {loading ? "Processing..." : "Sell 100%"}
-                  </button>
+                <td className={`p-2 border font-bold ${balance.profitLossPercent >= 0 ? "text-green-500" : "text-red-500"}`}>{balance.profitLossPercent}%</td>
+                <td className="p-2 border flex flex-col gap-2">
+                  <input type="number" placeholder="Buy Price" className="p-1 border rounded" onChange={(e) => setAutoTrade({ ...autoTrade, [balance.asset]: { ...autoTrade[balance.asset], buyPrice: parseFloat(e.target.value) } })} />
+                  <button className="bg-green-500 text-white px-3 py-1 rounded" onClick={() => handleTrade(balance.asset, "BUY")} disabled={loading}>{loading ? "Processing..." : "Buy 100%"}</button>
+                  <input type="number" placeholder="Sell Price" className="p-1 border rounded" onChange={(e) => setAutoTrade({ ...autoTrade, [balance.asset]: { ...autoTrade[balance.asset], sellPrice: parseFloat(e.target.value) } })} />
+                  <button className="bg-red-500 text-white px-3 py-1 rounded" onClick={() => handleTrade(balance.asset, "SELL")} disabled={loading}>{loading ? "Processing..." : "Sell 100%"}</button>
                 </td>
               </tr>
             ))}
