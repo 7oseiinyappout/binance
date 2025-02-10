@@ -12,12 +12,13 @@ export default function Home() {
   const [sortBy, setSortBy] = useState("profit");
   const [filteredData, setFilteredData] = useState([]);
   const [autoTrade, setAutoTrade] = useState({});
+  const [activeAutoTrades, setActiveAutoTrades] = useState({});
+  const [tradeMessage, setTradeMessage] = useState({});
 
   const fetchMarketData = async () => {
     try {
       const response = await axios.get("http://localhost:5000/api/trade/market");
       setMarketData(response.data.marketData);
-      sortData(response.data.marketData, sortBy);
     } catch (error) {
       console.error("Error fetching market data:", error);
     }
@@ -33,36 +34,30 @@ export default function Home() {
       console.error("Error fetching balance:", error);
     }
   };
-  const sortData = (data, criteria) => {
-    let sortedData = [...data];
-
-    if (criteria === "profit") {
-      sortedData.sort((a, b) => b.changePercent - a.changePercent); // 🔹 الأعلى ربحًا
-    } else if (criteria === "loss") {
-      sortedData.sort((a, b) => a.changePercent - b.changePercent); // 🔹 الأعلى خسارةً
-    } else if (criteria === "new") {
-      sortedData.sort(() => Math.random() - 0.5); // 🔹 ترتيب عشوائي
-    }
-
-    setFilteredData(sortedData);
-  };
-  useEffect(() => {
-    fetchBalance();
-    sortData(marketData, sortBy);
-    const interval = setInterval(fetchMarketData, 10000); // 🔹 تحديث البيانات كل 10 ثوانٍ
-    return () => clearInterval(interval);
-  }, [sortBy, marketData]);
-
-  const handleTrade = async (symbol, side) => {
+  
+  const handleTrade = async (symbol, side, price = null) => {
     setLoading(true);
     try {
-      const response = await axios.post("http://localhost:5000/api/trade/order", { symbol, side });
-      alert(`✅ Order placed successfully: ${response.data.order.orderId}`);
+      const response = await axios.post("http://localhost:5000/api/trade/order", { symbol, side, price });
+      setTradeMessage((prev) => ({
+        ...prev,
+        [symbol]: { text: `✅ ${side} ناجح`, color: side === "BUY" ? "text-red-500" : "text-green-500" }
+      }));
       await fetchBalance();
     } catch (error) {
-      alert(error.response?.data?.error || "❌ Trade failed!");
+      setTradeMessage((prev) => ({
+        ...prev,
+        [symbol]: { text: "❌ فشل التداول", color: "text-gray-500" }
+      }));
     }
     setLoading(false);
+  };
+
+  const toggleAutoTrade = (symbol) => {
+    setActiveAutoTrades((prev) => ({
+      ...prev,
+      [symbol]: !prev[symbol]
+    }));
   };
 
   useEffect(() => {
@@ -77,7 +72,7 @@ export default function Home() {
       try {
         const marketPrices = await axios.get("http://localhost:5000/api/trade/market");
         marketPrices.data.marketData.forEach((data) => {
-          if (autoTrade[data.asset]) {
+          if (activeAutoTrades[data.asset] && autoTrade[data.asset]) {
             if (autoTrade[data.asset].buyPrice && data.lastPrice <= autoTrade[data.asset].buyPrice) {
               handleTrade(data.asset, "BUY", autoTrade[data.asset].buyPrice);
             }
@@ -91,7 +86,9 @@ export default function Home() {
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [autoTrade]);
+  }, [activeAutoTrades, autoTrade]);
+
+
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
@@ -119,6 +116,12 @@ export default function Home() {
                   <button className="bg-green-500 text-white px-3 py-1 rounded" onClick={() => handleTrade(balance.asset, "BUY")} disabled={loading}>{loading ? "Processing..." : "Buy 100%"}</button>
                   <input type="number" placeholder="Sell Price" className="p-1 border rounded" onChange={(e) => setAutoTrade({ ...autoTrade, [balance.asset]: { ...autoTrade[balance.asset], sellPrice: parseFloat(e.target.value) } })} />
                   <button className="bg-red-500 text-white px-3 py-1 rounded" onClick={() => handleTrade(balance.asset, "SELL")} disabled={loading}>{loading ? "Processing..." : "Sell 100%"}</button>
+                  <button className={`px-3 py-1 rounded ${activeAutoTrades[balance.asset] ? "bg-gray-500" : "bg-blue-500"} text-white`} onClick={() => toggleAutoTrade(balance.asset)}>
+                    {activeAutoTrades[balance.asset] ? "إيقاف التداول التلقائي" : "بدء التداول التلقائي"}
+                  </button>
+                  {tradeMessage[balance.asset] && (
+                    <p className={`mt-2 font-bold ${tradeMessage[balance.asset].color}`}>{tradeMessage[balance.asset].text}</p>
+                  )}
                 </td>
               </tr>
             ))}
