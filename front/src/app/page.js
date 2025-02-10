@@ -14,6 +14,7 @@ export default function Home() {
   const [autoTrade, setAutoTrade] = useState({});
   const [activeAutoTrades, setActiveAutoTrades] = useState({});
   const [tradeMessage, setTradeMessage] = useState({});
+  const [lastTrade, setLastTrade] = useState({});
 
   const fetchMarketData = async () => {
     try {
@@ -42,6 +43,10 @@ export default function Home() {
       setTradeMessage((prev) => ({
         ...prev,
         [symbol]: { text: `✅ ${side} ناجح`, color: side === "BUY" ? "text-red-500" : "text-green-500" }
+      }));
+      setLastTrade((prev) => ({
+        ...prev,
+        [symbol]: { side, color: side === "BUY" ? "text-red-500" : "text-green-500" }
       }));
       await fetchBalance();
     } catch (error) {
@@ -89,7 +94,6 @@ export default function Home() {
   }, [activeAutoTrades, autoTrade]);
 
 
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
       <h1 className="text-3xl font-bold mb-4">My Binance Balance</h1>
@@ -101,6 +105,7 @@ export default function Home() {
               <th className="p-2 border">Free Balance</th>
               <th className="p-2 border">Value in USDT</th>
               <th className="p-2 border">Profit/Loss %</th>
+              <th className="p-2 border">Last Trade</th>
               <th className="p-2 border">Actions</th>
             </tr>
           </thead>
@@ -111,6 +116,7 @@ export default function Home() {
                 <td className="p-2 border">{balance.free}</td>
                 <td className="p-2 border">${balance.valueInUSDT}</td>
                 <td className={`p-2 border font-bold ${balance.profitLossPercent >= 0 ? "text-green-500" : "text-red-500"}`}>{balance.profitLossPercent}%</td>
+                <td className={`p-2 border font-bold ${lastTrade[balance.asset]?.color || "text-gray-500"}`}>{lastTrade[balance.asset]?.side || "-"}</td>
                 <td className="p-2 border flex flex-col gap-2">
                   <input type="number" placeholder="Buy Price" className="p-1 border rounded" onChange={(e) => setAutoTrade({ ...autoTrade, [balance.asset]: { ...autoTrade[balance.asset], buyPrice: parseFloat(e.target.value) } })} />
                   <button className="bg-green-500 text-white px-3 py-1 rounded" onClick={() => handleTrade(balance.asset, "BUY")} disabled={loading}>{loading ? "Processing..." : "Buy 100%"}</button>
