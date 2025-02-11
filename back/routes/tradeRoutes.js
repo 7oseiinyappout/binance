@@ -7,6 +7,6 @@ router.post('/sell', tradeController.sell);
 router.post('/convert', tradeController.convertCurrency);
 router.get('/balance', tradeController.getBalance);
 router.get('/market', tradeController.getMarketData);
-// router.get('/balance', tradeController.getBalance);
+router.get('/balance', tradeController.getBalance);
 router.post('/order', tradeController.placeOrder);
 module.exports = router;

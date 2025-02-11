@@ -122,7 +122,7 @@ export default function Home() {
                   <button className="bg-green-500 text-white px-3 py-1 rounded" onClick={() => handleTrade(balance.asset, "BUY")} disabled={loading}>{loading ? "Processing..." : "Buy 100%"}</button>
                   <input type="number" placeholder="Sell Price" className="p-1 border rounded" onChange={(e) => setAutoTrade({ ...autoTrade, [balance.asset]: { ...autoTrade[balance.asset], sellPrice: parseFloat(e.target.value) } })} />
                   <button className="bg-red-500 text-white px-3 py-1 rounded" onClick={() => handleTrade(balance.asset, "SELL")} disabled={loading}>{loading ? "Processing..." : "Sell 100%"}</button>
-                  <button className={`px-3 py-1 rounded ${activeAutoTrades[balance.asset] ? "bg-gray-500" : "bg-blue-500"} text-white`} onClick={() => toggleAutoTrade(balance.asset)}>
+                  <button  disabled={loading} className={`px-3 py-1 rounded ${activeAutoTrades[balance.asset] ? "bg-gray-500" : "bg-blue-500"} text-white`} onClick={() => toggleAutoTrade(balance.asset)}>
                     {activeAutoTrades[balance.asset] ? "إيقاف التداول التلقائي" : "بدء التداول التلقائي"}
                   </button>
                   {tradeMessage[balance.asset] && (
